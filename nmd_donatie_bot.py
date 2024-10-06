@@ -6,30 +6,6 @@ from lxml import html
 from config import EMAIL_ADDRESS, EMAIL_PASSWORD, IMAP_SERVER, IMAP_PORT
 import re
 
-# Ensure the donations table exists
-def initialize_database():
-    try:
-        connection = sqlite3.connect('donations.db')
-        cursor = connection.cursor()
-
-        # Create the donations table if it doesn't exist
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS donations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            voornaam TEXT,
-            achternaam TEXT,
-            type TEXT,
-            bedrag TEXT,
-            telefoonnummer TEXT,
-            email_id_number TEXT  -- This will store the unique email ID
-        )
-        ''')
-
-        connection.commit()
-        connection.close()
-    except Exception as e:
-        print(f"Error initializing the database: {e}")
-
 # Connect to the IMAP server and select the inbox
 def connect_to_email():
     try:
@@ -46,6 +22,8 @@ def read_email():
     mail = connect_to_email()
     if not mail:
         return
+
+    print("Application is running... waiting for new emails.")
 
     try:
         # Search for all emails in the inbox
@@ -106,7 +84,7 @@ def extract_donation_info(msg, email_id_number):
                             elif "sadaqa" in product.lower():
                                 channel = "Sadaqa"
                             else:
-                                channel = "Onbekend"
+                                channel = "Donatie"  # Default channel
 
                             # Format the output for each product individually with the channel information
                             message = f"{voornaam[0]} {achternaam[0]} - {product} (€{price}) - {telefoon[0]} => Wordt verzonden naar kanaal \"{channel}\""
@@ -114,9 +92,6 @@ def extract_donation_info(msg, email_id_number):
 
                             # Save each product to the database
                             save_donation_to_db((voornaam[0], achternaam[0], product, f"€{price}", telefoon[0], email_id_number))
-                    else:
-                        print("Error: One or more fields are empty!")
-                        print(f"Voornaam: {voornaam}, Achternaam: {achternaam}, Telefoon: {telefoon}, Products: {products}, Prices: {prices}")
     except Exception as e:
         print(f"Error: {e}")
         pass
@@ -127,10 +102,17 @@ def save_donation_to_db(donation):
         connection = sqlite3.connect('donations.db')
         cursor = connection.cursor()
 
-        # Check the donation tuple to make sure it has the right number of values
-        if len(donation) != 6:
-            print(f"Error: Incorrect number of values to save in the database: {donation}")
-            return
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS donations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            voornaam TEXT,
+            achternaam TEXT,
+            type TEXT,
+            bedrag TEXT,
+            telefoonnummer TEXT,
+            email_id_number TEXT  -- This will store the unique email ID
+        )
+        ''')
 
         cursor.execute('''
         INSERT INTO donations (voornaam, achternaam, type, bedrag, telefoonnummer, email_id_number)
@@ -165,12 +147,10 @@ def is_email_id_processed(email_id_number):
 
 # Main loop to continuously check for new emails
 def main():
-    # Ensure the table is created before processing
-    initialize_database()
-
+    print("Started application")  # Log when the application starts
     while True:
         read_email()
-        time.sleep(10)  # Check every 10 seconds
+        time.sleep(10)  # Check every 10 seconds, This needs to be configured after discussion with stakeholders.
 
 if __name__ == "__main__":
     main()
